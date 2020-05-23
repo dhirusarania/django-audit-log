@@ -3,12 +3,13 @@ from __future__ import unicode_literals
 import copy
 import datetime
 from django.db import models
-from django.utils.functional import curry
+# from django.utils.functional import curry
+from functools import partial
+
 from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
 
 from audit_log.models.fields import LastUserField
-from audit_log import settings as local_settings
 
 
 try:
@@ -17,6 +18,11 @@ try:
 except ImportError:
     import datetime
     datetime_now = datetime.datetime.now
+
+
+
+def curry(func, *a, **kw):
+        return partial(func, *a, **kw)
 
 
 class LogEntryObjectDescriptor(object):
@@ -56,8 +62,6 @@ class AuditLogManager(models.Manager):
         setattr(self.instance, '__is_%s_enabled'%self.attname, False)
 
     def is_tracking_enabled(self):
-        if local_settings.DISABLE_AUDIT_LOG:
-            return False
         if self.instance is None:
             raise ValueError("Tracking can only be enabled or disabled "
                                     "per model instance, not on a model class")
@@ -166,20 +170,13 @@ class AuditLog(object):
                     field.db_index = True
 
 
-                if field.remote_field and field.remote_field.related_name:
-                    field.remote_field.related_name = '_auditlog_{}_{}'.format(
-                        model._meta.model_name,
-                        field.remote_field.related_name
-                    )
-                elif field.remote_field:
-                    try:
-                        if field.remote_field.get_accessor_name():
-                            field.remote_field.related_name = '_auditlog_{}_{}'.format(
-                                model._meta.model_name,
-                                field.remote_field.get_accessor_name()
-                            )
-                    except e:
-                        pass
+                if field.rel and field.rel.related_name:
+                    field.rel.related_name = '_auditlog_%s' % field.rel.related_name
+
+
+
+
+
 
                 fields[field.name] = field
 
